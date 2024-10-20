@@ -27,8 +27,21 @@ type TopUpResult struct {
 	CreatedDate   time.Time `json:"created_date"`   // Date of the top-up
 }
 
+type TransactionResponse struct {
+	TransferID      string    `json:"transfer_id"`
+	Status          string    `json:"status"`
+	UserID          string    `json:"user_id"`
+	TransactionType string    `json:"transaction_type"`
+	Amount          float64   `json:"amount"`
+	Remarks         string    `json:"remarks"`
+	BalanceBefore   float64   `json:"balance_before"`
+	BalanceAfter    float64   `json:"balance_after"`
+	CreatedDate     time.Time `json:"created_date"`
+}
+
 // TopUp handles user top-ups.
 func (h *AppHandler) HandleTopUp(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	userID, ok := r.Context().Value(auth.UserIDKey).(string)
 
 	if !ok {
@@ -116,12 +129,13 @@ func (h *AppHandler) HandleTopUp(w http.ResponseWriter, r *http.Request) {
 
 		// Create an account transaction log record
 		transactionLog := models.AccountTransactionLog{
-			TransactionType: "TOPUP",
-			TransactionReff: topupTrxID,
-			UserAccountID:   userAccount.ID,
-			Amount:          req.Amount,
-			BalanceBefore:   updatedUserAccount.LastBalance,
-			BalanceAfter:    updatedUserAccount.CurrentBalance,
+			TransactionType:     "CREDIT",
+			TransactionCategory: "TOPUP",
+			TransactionReff:     topupTrxID,
+			UserAccountID:       userAccount.ID,
+			Amount:              req.Amount,
+			BalanceBefore:       updatedUserAccount.LastBalance,
+			BalanceAfter:        updatedUserAccount.CurrentBalance,
 		}
 
 		if err := tx.Create(&transactionLog).Error; err != nil {
@@ -151,7 +165,62 @@ func (h *AppHandler) HandleTopUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(NewSuccessResponse(topupResult))
+}
+
+func (h *AppHandler) GetTransactionList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	userID, ok := r.Context().Value(auth.UserIDKey).(string)
+
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(NewFailedResponse("User ID not found in context"))
+		return
+	}
+
+	var user models.User
+	if err := h.DB.Where("uid = ?", userID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(NewFailedResponse("User ID not found in context"))
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(NewFailedResponse("User ID not found in context"))
+		return
+	}
+
+	var userAccount models.UserAccount
+	if err := h.DB.Where("user_id = ?", user.ID).First(&userAccount).Error; err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(NewFailedResponse("User Account not found in context"))
+		return
+	}
+
+	var transactionLogs []models.AccountTransactionLog
+	if err := h.DB.Where("user_account_id = ?", userAccount.ID).Order("id desc").Find(&transactionLogs).Error; err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(NewFailedResponse("Failed to retrieve transactions"))
+		return
+	}
+
+	// Convert the logs to response format
+	var transactions []TransactionResponse
+	for _, log := range transactionLogs {
+		transactions = append(transactions, TransactionResponse{
+			TransferID:      log.TransactionReff, // Assuming UID is used as transfer_id
+			Status:          log.Status,
+			UserID:          userID, // Assuming the user ID is the same for all logs retrieved
+			TransactionType: log.TransactionType,
+			Amount:          log.Amount,
+			Remarks:         log.Remarks,
+			BalanceBefore:   log.BalanceBefore,
+			BalanceAfter:    log.BalanceAfter,
+			CreatedDate:     log.CreatedAt, // Assuming CreatedAt is the time field in your model
+		})
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(NewSuccessResponse(transactions))
 }

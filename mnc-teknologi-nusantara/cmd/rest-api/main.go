@@ -58,7 +58,7 @@ func ConnectDB() *gorm.DB {
 func MigrateDatabase(db *gorm.DB) error {
 	m := gormigrate.New(db, gormigrate.DefaultOptions, []*gormigrate.Migration{
 		{
-			ID: "20241020_05",
+			ID: "20241020_09",
 			Migrate: func(tx *gorm.DB) error {
 				if err := tx.AutoMigrate(
 					&models.User{},
@@ -108,6 +108,7 @@ func NewRouter(db *gorm.DB, accessTokenKey, refreshTokenKey []byte) *mux.Router 
 	r.Handle("/topup", middlewares.JWTMiddleware(accessTokenKey)(http.HandlerFunc(appHandler.HandleTopUp))).Methods("POST")
 	r.Handle("/pay", middlewares.JWTMiddleware(accessTokenKey)(http.HandlerFunc(appHandler.HandlePayment))).Methods("POST")
 	r.Handle("/transfer", middlewares.JWTMiddleware(accessTokenKey)(http.HandlerFunc(appHandler.HandleTransfer))).Methods("POST")
+	r.Handle("/transactions", middlewares.JWTMiddleware(accessTokenKey)(http.HandlerFunc(appHandler.GetTransactionList))).Methods("GET")
 
 	return r
 }

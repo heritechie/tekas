@@ -53,30 +53,34 @@ var DB *gorm.DB
 
 // Register handles user registration.
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(NewFailedResponse("Invalid request payload"))
 		return
 	}
 
 	// Validate input
 	validate := validator.New()
 	if err := validate.Struct(req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(NewFailedResponse("Invalid request payload"))
 		return
 	}
 
-	// Check if the phone number already exists
 	var existingUser models.User
 	if err := h.DB.Where("phone_number = ?", req.PhoneNumber).First(&existingUser).Error; err == nil {
-		http.Error(w, "Phone number already registered", http.StatusConflict)
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(NewFailedResponse("User not found"))
 		return
 	}
 
 	// Hash the PIN before saving it
 	hashedPin, err := bcrypt.GenerateFromPassword([]byte(req.PIN), bcrypt.DefaultCost)
 	if err != nil {
-		http.Error(w, "Failed to hash PIN", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(NewFailedResponse("Invalid PIN"))
 		return
 	}
 
@@ -113,29 +117,33 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 // Login handles user login and generates a JWT token.
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(NewFailedResponse("Invalid request payload"))
 		return
 	}
 
 	// Validate input
 	validate := validator.New()
 	if err := validate.Struct(req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(NewFailedResponse("Invalid request payload"))
 		return
 	}
 
 	var user models.User
-	// Find user by phone number
 	if err := h.DB.Where("phone_number = ?", req.PhoneNumber).First(&user).Error; err != nil {
-		http.Error(w, "User not found", http.StatusUnauthorized)
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(NewFailedResponse("User not found"))
 		return
 	}
 
 	// Check if PIN matches
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Pin), []byte(req.PIN)); err != nil {
-		http.Error(w, "Invalid PIN", http.StatusUnauthorized)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(NewFailedResponse("Invalid PIN"))
 		return
 	}
 
@@ -151,7 +159,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Sign the access token with the secret key
 	accessTokenString, err := accessToken.SignedString(h.AccessTokenKey)
 	if err != nil {
-		http.Error(w, "Could not create access token", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(NewFailedResponse("Invalid access token"))
 		return
 	}
 
@@ -167,7 +176,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Sign the refresh token with the secret key
 	refreshTokenString, err := refreshToken.SignedString(h.RefreshTokenKey)
 	if err != nil {
-		http.Error(w, "Could not create refresh token", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(NewFailedResponse("Invalid refresh token"))
 		return
 	}
 

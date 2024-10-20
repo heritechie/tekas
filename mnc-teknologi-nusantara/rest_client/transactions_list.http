@@ -1,9 +1,3 @@
-POST http://localhost:8080/transfer
+GET http://localhost:8080/transactions
 Content-Type: application/json 
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiI2NzNmNjk5ZS02ZjcwLTQwYTMtYTBkYS0yZDUzNmJjYjllYmMiLCJleHAiOjE3Mjk1MDQ1NTJ9.i0kAq6U9PHCpynCBKR3eFjXApVFmf8B6bZBVuLHj18A
-
-{
-    "amount": 120000001.00,
-    "target_user": "01124b9b-1e28-47eb-a8a7-a282269081ba",
-    "remarks": "Hadiah Ultah 5"
-}

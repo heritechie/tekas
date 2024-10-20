@@ -28,6 +28,7 @@ type PaymentResult struct {
 }
 
 func (h *AppHandler) HandlePayment(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	userID, ok := r.Context().Value(auth.UserIDKey).(string)
 
 	if !ok {
@@ -59,6 +60,15 @@ func (h *AppHandler) HandlePayment(w http.ResponseWriter, r *http.Request) {
 		Remarks:   req.Remarks,
 	}
 
+	baseTransactionLog := models.AccountTransactionLog{
+		TransactionCategory: "PAYMENT",
+		Amount:              req.Amount,
+		Remarks:             req.Remarks,
+		TransactionReff:     paymentTrxID,
+	}
+
+	var userAccount models.UserAccount
+
 	// Start a new transaction
 	err := h.DB.Transaction(func(tx *gorm.DB) error {
 		var user models.User
@@ -69,14 +79,12 @@ func (h *AppHandler) HandlePayment(w http.ResponseWriter, r *http.Request) {
 			return err // Return the error to rollback the transaction for other errors
 		}
 
-		// Fetch the user's account
-		var userAccount models.UserAccount
 		if err := tx.Where("user_id = ?", user.ID).First(&userAccount).Error; err != nil {
 			return err
 		}
 
 		if userAccount.CurrentBalance < req.Amount {
-			return errors.New("balance is not enough")
+			return errors.New("insufficient balance")
 		}
 
 		// Update balances
@@ -106,15 +114,11 @@ func (h *AppHandler) HandlePayment(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
-		// Create an account transaction log record
-		transactionLog := models.AccountTransactionLog{
-			TransactionType: "PAYMENT",
-			TransactionReff: paymentTrxID,
-			UserAccountID:   updatedUserAccount.ID,
-			Amount:          req.Amount,
-			BalanceBefore:   updatedUserAccount.LastBalance,
-			BalanceAfter:    updatedUserAccount.CurrentBalance,
-		}
+		transactionLog := baseTransactionLog
+		transactionLog.UserAccountID = userAccount.ID
+		transactionLog.TransactionType = "DEBIT"
+		transactionLog.BalanceBefore = updatedUserAccount.LastBalance
+		transactionLog.BalanceAfter = updatedUserAccount.CurrentBalance
 
 		if err := tx.Create(&transactionLog).Error; err != nil {
 			return err // Return the error to rollback the transaction
@@ -133,9 +137,23 @@ func (h *AppHandler) HandlePayment(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		if err.Error() == "balance is not enough" {
+		if err.Error() == "insufficient balance" {
+			errMessage := "Balance is not enough"
+			transactionLog := baseTransactionLog
+			transactionLog.UserAccountID = userAccount.ID
+			transactionLog.TransactionType = "DEBIT"
+			transactionLog.BalanceBefore = userAccount.LastBalance
+			transactionLog.BalanceAfter = userAccount.CurrentBalance
+			transactionLog.Status = "FAILED"
+			transactionLog.ErrMessage = errMessage
+
+			if err := h.DB.Create(&transactionLog).Error; err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(NewFailedResponse(errMessage))
+			}
+
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(NewFailedResponse("Insufficient balance"))
+			json.NewEncoder(w).Encode(NewFailedResponse(errMessage))
 		} else if err.Error() == "user not found" {
 			w.WriteHeader(http.StatusNotFound)
 			json.NewEncoder(w).Encode(NewFailedResponse("User not found"))
@@ -146,7 +164,6 @@ func (h *AppHandler) HandlePayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(NewSuccessResponse(paymentResult))
 }
