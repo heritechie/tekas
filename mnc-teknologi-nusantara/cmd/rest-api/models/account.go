@@ -18,9 +18,10 @@ type AccountTransactionLog struct {
 	gorm.Model
 	UserAccountID   uint    `json:"user_account_id" gorm:"not null"`  // Foreign key referencing UserAccount
 	Amount          float64 `json:"amount" gorm:"not null"`           // The amount of the transaction
-	TransactionType string  `json:"transaction_type" gorm:"not null"` // Type: "topup", "payment", etc.
-	BalanceBefore   float64 `json:"balance_before"`                   // Balance before the transaction
-	BalanceAfter    float64 `json:"balance_after"`                    // Balance after the transaction
+	TransactionType string  `json:"transaction_type" gorm:"not null"` // Type: "topup", "payment", "transfer" etc.
+	TransactionReff string  `json:"transaction_reff"`
+	BalanceBefore   float64 `json:"balance_before"` // Balance before the transaction
+	BalanceAfter    float64 `json:"balance_after"`  // Balance after the transaction
 
 	UserAccount UserAccount `gorm:"foreignKey:UserAccountID"`
 }

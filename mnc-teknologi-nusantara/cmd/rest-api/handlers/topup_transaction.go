@@ -116,10 +116,12 @@ func (h *AppHandler) HandleTopUp(w http.ResponseWriter, r *http.Request) {
 
 		// Create an account transaction log record
 		transactionLog := models.AccountTransactionLog{
-			UserAccountID: userAccount.ID,
-			Amount:        req.Amount,
-			BalanceBefore: updatedUserAccount.LastBalance,
-			BalanceAfter:  updatedUserAccount.CurrentBalance,
+			TransactionType: "TOPUP",
+			TransactionReff: topupTrxID,
+			UserAccountID:   userAccount.ID,
+			Amount:          req.Amount,
+			BalanceBefore:   updatedUserAccount.LastBalance,
+			BalanceAfter:    updatedUserAccount.CurrentBalance,
 		}
 
 		if err := tx.Create(&transactionLog).Error; err != nil {

@@ -1,0 +1,10 @@
+POST http://localhost:8080/register
+Content-Type: application/json
+
+{
+  "first_name": "testuser2",
+  "last_name": "testuser2",
+  "phone_number": "089111222333",
+  "address": "Alamat 1",
+  "pin": "12345"
+}

@@ -108,10 +108,12 @@ func (h *AppHandler) HandlePayment(w http.ResponseWriter, r *http.Request) {
 
 		// Create an account transaction log record
 		transactionLog := models.AccountTransactionLog{
-			UserAccountID: updatedUserAccount.ID,
-			Amount:        req.Amount,
-			BalanceBefore: updatedUserAccount.LastBalance,
-			BalanceAfter:  updatedUserAccount.CurrentBalance,
+			TransactionType: "PAYMENT",
+			TransactionReff: paymentTrxID,
+			UserAccountID:   updatedUserAccount.ID,
+			Amount:          req.Amount,
+			BalanceBefore:   updatedUserAccount.LastBalance,
+			BalanceAfter:    updatedUserAccount.CurrentBalance,
 		}
 
 		if err := tx.Create(&transactionLog).Error; err != nil {
