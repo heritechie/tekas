@@ -1,0 +1,24 @@
+# .air.toml
+root = "."
+tmp_dir = "tmp"  # Temporary directory for compiled binary
+# Uncomment and adjust as needed
+# include_ext = ["go", "tpl", "tmpl", "html", "md"]
+# exclude_dir = ["assets", "vendor"]
+
+[build]
+  cmd = "go build -o tmp/main ./cmd/rest-api/main.go"  # Adjusted path
+  bin = "tmp/main"  # Output binary path
+  watch_dir = ["."]
+  watch_ext = ["go"]
+  delay = 2000  # Delay in milliseconds
+
+[log]
+  level = "info"
+  time = true
+
+[env]
+  DB_HOST = "db"
+  DB_USER = "mnctech"
+  DB_PASSWORD = "mnctechpass"
+  DB_NAME = "mnctechdb"
+  DB_PORT = "5432"

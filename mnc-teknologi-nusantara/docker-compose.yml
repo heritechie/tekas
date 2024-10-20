@@ -1,0 +1,55 @@
+services:
+  rest-api:
+    build:
+      context: .
+      target: dev
+    volumes:
+      - .:/app
+    environment:
+      - DB_HOST=db
+      - DB_USER=mnctech
+      - DB_PASSWORD=mnctechpass
+      - DB_NAME=mnctechdb
+      - DB_PORT=5432
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+      - redis
+      - rabbitmq
+    command: air
+
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: mnctech
+      POSTGRES_PASSWORD: mnctechpass
+      POSTGRES_DB: mnctechdb
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:management
+    ports:
+      - "5672:5672"
+      - "15672:15672" # Management UI
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=pgadmin4@pgadmin.org
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+
+volumes:
+  db_data:
