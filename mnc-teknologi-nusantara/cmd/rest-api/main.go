@@ -7,6 +7,7 @@ import (
 	"mnctech-restapi/cmd/rest-api/models"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-gormigrate/gormigrate/v2"
 
@@ -19,6 +20,7 @@ import (
 func main() {
 	// Connect to the database and perform migrations
 	db := ConnectDB()
+	defer CloseDBConnection(db)                               // Ensure database connection is closed on exit
 	accessTokenKey := []byte(os.Getenv("ACCESS_TOKEN_KEY"))   // or replace with your actual key
 	refreshTokenKey := []byte(os.Getenv("REFRESH_TOKEN_KEY")) // or replace with your actual key
 
@@ -51,7 +53,32 @@ func ConnectDB() *gorm.DB {
 		log.Fatal(err)
 	}
 
+	// Retrieve the underlying sql.DB from GORM and configure connection pool
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Set up connection pool settings
+	sqlDB.SetMaxIdleConns(10)           // Set maximum number of idle connections
+	sqlDB.SetMaxOpenConns(100)          // Set maximum number of open connections
+	sqlDB.SetConnMaxLifetime(time.Hour) // Set maximum connection lifetime
+
 	return db
+}
+
+// CloseDBConnection closes the database connection pool.
+func CloseDBConnection(db *gorm.DB) {
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Printf("Error getting DB from GORM: %v", err)
+		return
+	}
+	if err := sqlDB.Close(); err != nil {
+		log.Printf("Error closing DB connection: %v", err)
+	} else {
+		log.Println("Database connection closed successfully.")
+	}
 }
 
 // MigrateDatabase initializes the database migrations
